@@ -1,11 +1,11 @@
-# 📄 Paper Review: Attention Is All You Need
+# Paper Review: Attention Is All You Need
 
 > Vaswani et al., NIPS 2017  
 > 발표자: 김지형 (세종대학교)
 
 ---
 
-## 📌 논문 개요
+## 논문 개요
 
 | 항목 | 내용 |
 |------|------|
@@ -16,7 +16,7 @@
 
 ---
 
-## 🧠 Introduction: 왜 Transformer인가?
+## Introduction: 왜 Transformer인가?
 
 기존 NLP는 RNN/LSTM 기반 Seq2Seq 모델이 지배적이었으나 두 가지 근본적인 한계가 있었습니다.
 
@@ -35,25 +35,25 @@ RNN/LSTM/GRU  →  Seq2Seq + Attention  →  Transformer
 
 ---
 
-## ⚠️ Background: 기존 모델의 한계
+## Background: 기존 모델의 한계
 
 | Model | 시간 복잡도 | 경로 길이 | 문제점 |
 |-------|------------|----------|--------|
 | RNN | O(n) | O(n) | 순차 처리 병목, 장기 의존성 취약 |
 | CNN | O(log n) | O(log n) | Receptive Field 제한 |
-| **Transformer** | **O(1)** | **O(1)** | ✅ 해결 |
+| **Transformer** | **O(1)** | **O(1)** | 해결 |
 
 ---
 
-## 🎯 Motivation & Goal
+## Motivation & Goal
 
-- ✅ **완전한 병렬화**: 모든 토큰을 동시에 처리하여 GPU 자원 극대화  
-- ✅ **상수 시간 연결**: 모든 단어 간 직접 연결(Direct Access)로 경로 최소화  
-- ✅ **장기 의존성 해결**: 문장 길이에 상관없이 정보 손실 없는 학습
+-  **완전한 병렬화**: 모든 토큰을 동시에 처리하여 GPU 자원 극대화  
+-  **상수 시간 연결**: 모든 단어 간 직접 연결(Direct Access)로 경로 최소화  
+-  **장기 의존성 해결**: 문장 길이에 상관없이 정보 손실 없는 학습
 
 ---
 
-## 🏗️ Model Architecture
+## Model Architecture
 
 ### 전체 구조
 
@@ -65,7 +65,7 @@ RNN/LSTM/GRU  →  Seq2Seq + Attention  →  Transformer
 
 ---
 
-## 🔑 Core Mechanism: Scaled Dot-Product Attention
+## Core Mechanism: Scaled Dot-Product Attention
 
 $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$
 
@@ -80,7 +80,7 @@ $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)
 
 ---
 
-## 🧩 Multi-Head Attention
+## Multi-Head Attention
 
 단일 Attention의 편향 위험을 완화하고, 다양한 관점의 정보를 병렬로 학습합니다.
 
@@ -90,7 +90,7 @@ $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)
 
 ---
 
-## 📍 Positional Encoding
+## Positional Encoding
 
 Recurrence가 없어 위치 정보를 별도로 주입해야 합니다.
 
@@ -104,7 +104,7 @@ $$PE_{(pos,2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)$$
 
 ---
 
-## ⚙️ Training Configuration
+## Training Configuration
 
 | 항목 | Base | Big |
 |------|------|-----|
@@ -117,7 +117,7 @@ $$PE_{(pos,2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)$$
 
 ---
 
-## 📊 Experimental Results
+## Experimental Results
 
 ### Translation Performance (EN-DE)
 
@@ -141,7 +141,7 @@ $$PE_{(pos,2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)$$
 
 ---
 
-## ✅ Strengths
+## Strengths
 
 1. **완전한 병렬 처리**: RNN O(n) → Transformer O(1)
 2. **장기 의존성 해결**: 경로 길이 O(n) → O(1) 직접 연결
@@ -149,7 +149,7 @@ $$PE_{(pos,2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)$$
 
 ---
 
-## ⚡ Limitations & Solutions
+## Limitations & Solutions
 
 | 한계 | 설명 | 해결책 |
 |------|------|--------|
@@ -159,7 +159,7 @@ $$PE_{(pos,2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)$$
 
 ---
 
-## 🌍 Impact & Future
+## Impact & Future
 
 - **BERT, RoBERTa**: Encoder 기반, 양방향 문맥 이해
 - **GPT-4, ChatGPT**: Decoder-only, 인간 수준 텍스트 생성
@@ -169,7 +169,7 @@ $$PE_{(pos,2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)$$
 
 ---
 
-## 📁 Files
+## Files
 
 | 파일 | 설명 |
 |------|------|
@@ -177,7 +177,7 @@ $$PE_{(pos,2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)$$
 
 ---
 
-## 📚 Reference
+## Reference
 
 - Vaswani, A., et al. (2017). *Attention Is All You Need*. NIPS 2017.  
   [arxiv.org/abs/1706.03762](https://arxiv.org/abs/1706.03762)
