@@ -1,0 +1,326 @@
+# CNN-LSTM 논문 리뷰
+> A CNN-LSTM-Based Model to Forecast Stock Prices
+> Lu, Li, Li, Sun, Wang · Complexity, 2020
+> https://onlinelibrary.wiley.com/doi/10.1155/2020/6622927
+
+- 난이도: ★☆☆
+- lens 대응 파일: `ai/models/cnn_lstm.py`
+- 8개 피처: 시가·고가·저가·종가·거래량·거래대금·등락(ups&downs)·변화율(change)
+
+---
+
+## 1. 한 줄 요약
+
+이전 10일치 주가 데이터를 CNN으로 특성 추출하고, 그 특성을 LSTM에 넣어
+다음날 종가를 예측하는 모델. 단독 MLP/CNN/RNN/LSTM보다 오차(MAE·RMSE)가 낮았다.
+
+---
+
+## 2. 본문 해석 노트
+
+### 2-1. 데이터가 흘러가는 모양
+
+```
+입력: 10일치 × 8피처          [B, 10, 8]
+   ↓  transpose(1,2)  ← 피처=채널, 날짜=길이로 축 교환
+                               [B, 8, 10]
+   ↓
+1D Conv (시간축을 훑으며 필터링) + Pooling
+                               [B, C, 10']
+   ↓  다시 축 교환 (LSTM은 [B, 길이, 채널]을 기대)
+                               [B, 10', C]
+   ↓
+LSTM (시간 순서대로 읽으며 기억 누적)
+   ↓
+마지막 timestep의 hidden state  [B, H]
+   ↓
+Dense (Fully Connected)
+   ↓
+출력: 다음날 종가                [B, 1]
+```
+
+### 2-2. 왜 CNN → LSTM 순서인가 (역할 분담)
+
+**CNN = 공간(모양) 압축기**
+Conv 필터가 시간축을 슬라이딩하며 인접한 며칠을 한 번에 본다.
+"3일 연속 상승 후 거래량 급증" 같은 짧은 구간의 지역 패턴(local pattern)을 잡는다.
+원본 8개 숫자를 그대로 쓰는 것보다 의미가 압축된 피처가 나온다.
+
+> PatchTST의 patching과 문제의식이 동일하다.
+> "하루치 숫자 하나는 의미가 너무 작다 → 여러 날을 묶어야 한다."
+> CNN은 conv 필터로, PatchTST는 patch로 풀었을 뿐. (4주차에서 재회)
+
+**LSTM = 시간(순서) 통합기**
+CNN은 순서 감각이 약하다. 필터는 위치와 무관하게 같은 패턴을 찾으므로
+(translation invariance) "그 급등이 10일 중 언제였는지"를 구분하지 못한다.
+LSTM은 시간 순서대로 읽으며 cell state에 기억을 누적해 시간적 의존성을 담당한다.
+
+각각만 쓰면:
+- LSTM만 → 노이즈 많은 원시 8개 값을 그대로 먹어 지역 패턴을 스스로 찾아야 하는 부담
+- CNN만 → 지역 패턴은 잡지만 순서 구분이 약함 (시계열에선 치명적)
+
+### 2-3. 왜 마지막 hidden state만 쓰는가
+
+LSTM은 순차적으로 읽으며 기억을 누적하므로, 마지막 timestep의 hidden state가
+10일 전체를 요약한 벡터다. 다음날을 예측하려면 가장 최신 시점까지의 정보가
+모두 담긴 것이 필요하다.
+
+> 단, "마지막 것만" 쓰면 앞쪽 정보가 희석된다.
+> lens의 `cnn_lstm.py`는 논문과 달리 `AttentionPooling1D`로 모든 timestep을
+> 가중합한다 — "어느 날이 중요한지"를 학습으로 정하는 방식. (5. lens 연계 참고)
+
+### 2-4. 논문의 실험 설계
+
+MLP / CNN / RNN / LSTM / CNN-RNN 을 하나씩 다 돌려("one by one") CNN-LSTM과 비교했다.
+이 논문의 기여는 새 연산의 발명이 아니라 **기존 블록 조합이 실제로 더 낫다는 실증**이다.
+
+### 2-5. 함정 메모 — transpose 누락
+
+`[B, 10, 8]`을 그대로 Conv1d에 넣으면 필터가 시간축이 아니라 **피처축**을 훑는다.
+"시가→고가→저가" 순서를 시간처럼 취급하는 무의미한 연산이 된다.
+에러 없이 조용히 학습만 망가지는 유형의 버그.
+
+```python
+x = x.transpose(1, 2)   # [B, 10, 8] → [B, 8, 10]
+# permute(0, 2, 1) 도 동일
+```
+
+---
+
+## 3. 수학 리뷰
+
+### 3-1. LSTM 게이트 — 왜 게이트가 3개인가
+
+핵심은 cell state C_t 라는 "기억 컨베이어 벨트"이고, 여기에 밸브 3개가 달려 있다.
+
+```
+f_t = σ(W_f · [h_{t-1}, x_t] + b_f)     망각(forget): 기존 기억 중 뭘 버릴까
+i_t = σ(W_i · [h_{t-1}, x_t] + b_i)     입력(input):  새 정보 중 뭘 받을까
+C̃_t = tanh(W_C · [h_{t-1}, x_t] + b_C)  후보 기억
+
+C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t        ★ 기억 갱신 (핵심 라인)
+
+o_t = σ(W_o · [h_{t-1}, x_t] + b_o)     출력(output): 기억 중 뭘 내보낼까
+h_t = o_t ⊙ tanh(C_t)
+```
+
+**직관 3가지**
+
+1. **σ(시그모이드)가 게이트인 이유** — 출력이 0~1이라 비율 조절 밸브가 된다.
+   0이면 완전 차단, 1이면 완전 통과. tanh는 -1~1이라 값의 *내용*을 만들고,
+   σ는 그 값의 *양*을 정한다. 역할이 다르다.
+
+2. **⊙(원소별 곱)인 이유** — 행렬곱이 아니라 원소별 곱이라서 기억 벡터의
+   각 차원마다 독립적으로 "이건 유지, 저건 삭제"를 결정할 수 있다.
+
+3. **덧셈이 진짜 핵심** ★
+
+```
+RNN:  기억 = tanh(W × 기존기억)       ← 곱하기 사슬 → 0.9^100 ≈ 0 (기울기 소실)
+LSTM: 기억 = f×기존기억 + i×새후보     ← 덧셈 → gradient가 그대로 흘러감
+```
+
+> 이 "덧셈으로 흘려보내기"가 곧 residual connection과 같은 아이디어다.
+> ResNet의 y = F(x) + x, TiDE의 residual block, Transformer의 skip connection이
+> 전부 같은 원리. (3주차 TiDE에서 재회)
+
+**극단 사고실험**: forget gate가 항상 1, input gate가 항상 0이면?
+
+```
+새 기억 = (1 × 기존기억) + (0 × 새후보) = 기존기억
+```
+
+기억이 절대 변하지 않는다. 첫 시점 정보를 끝까지 들고 가고 새 입력은 전부 무시하는
+화석 상태. 게이트의 존재 이유 = "얼마나 잊고 얼마나 받아들일지"를 상황마다 조절하는 것.
+
+### 3-2. Receptive Field — dilation을 쓰는 이유
+
+receptive field(RF) = 출력값 하나가 원본 입력의 며칠치를 보고 만들어졌는가.
+
+**일반 conv** (커널 k, L층):
+
+```
+RF = 1 + L × (k-1)
+
+k=3, L=3  →  RF = 1 + 3×2 = 7일
+```
+
+깊이에 **선형적으로만** 늘어난다.
+
+**dilated conv** (필터 사이에 간격):
+
+```
+dilation=1:  ●●●        (인접 3일)
+dilation=2:  ●_●_●      (1,3,5일)
+dilation=4:  ●___●___●  (1,5,9일)
+
+RF = 1 + Σ (k-1) × d_i
+
+k=3, d=[1,2,4]     → 1 + 2×(1+2+4)   = 15일
+k=3, d=[1,2,4,8]   → 1 + 2×(1+2+4+8) = 31일   ← lens 설정
+```
+
+층 수는 그대로인데 RF가 **지수적으로** 커진다.
+
+**왜 중요한가** — lens는 120일치를 입력으로 쓴다.
+
+```
+dilation 없이 120일 커버:  120 = 1 + L×2  →  L ≈ 60층
+dilated 사용:              [1,2,4,8,16,32] → RF 127일  →  6층
+```
+
+**60층 vs 6층.** 층이 깊어지면 파라미터·연산량·기울기 소실이 함께 늘어나므로,
+같은 시야를 10배 얕은 네트워크로 확보하는 것이 결정적이다.
+lens의 `cnn_lstm.py`가 dilation `[1,2,4,8]`(RF=31)을 쓰는 이유.
+
+---
+
+## 4. 코드 리뷰
+
+코드: [`code/solution.py`](code/solution.py) · 검증: [`code/run_shapes.py`](code/run_shapes.py)
+
+```
+input          [B, L, F] : (4, 120, 36)
+after conv     [B, C, L] : (4, 64, 120)
+receptive field          : 31
+output         [B, H]    : (4, 5)
+attn weights sum         : 1.0000
+```
+
+### 4-1. 축 번호(dim)는 "몇 번째 축"이라는 번호다
+
+가장 헷갈렸던 지점. `dim`이나 `permute`에 넣는 건 shape 값(120, 36)이 아니라
+**축의 순번(0, 1, 2)** 이다.
+
+```
+x.shape = [ 4 ,  120 ,  36 ]
+            ↑     ↑      ↑
+          dim=0  dim=1  dim=2
+          배치    시간    피처
+```
+
+**permute = 새 자리마다 옛날 몇 번 축을 가져올지 나열**
+
+```python
+x.permute(0, 2, 1)
+#         ↑  ↑  ↑
+#         │  │  └─ 새 2번 자리 ← 옛날 1번 축(시간)
+#         │  └──── 새 1번 자리 ← 옛날 2번 축(피처)
+#         └─────── 새 0번 자리 ← 옛날 0번 축(배치)
+
+[B, 120, 36] --permute(0,2,1)--> [B, 36, 120]
+```
+
+conv 앞(축 교환)과 LSTM 앞(되돌리기) 모두 `permute(0, 2, 1)`. 서로 역연산.
+
+**softmax(dim=1)** = 1번 축(시간)을 따라 확률로 만든다.
+120일끼리 경쟁시켜 합이 1이 되게 → `.sum(dim=1)`로 가중합하면 시간축이 사라진다.
+
+> dim=2로 하면 scores가 `[B,120,1]`이라 축 길이가 1 → 전부 1.0이 되는 조용한 버그.
+
+### 4-2. padding — 왜 `padding=dilation`인가
+
+커널 3짜리 창문이 미끄러질 때 양 끝에서 창문이 밖으로 떨어진다.
+
+```
+길이 8, k=3, d=1
+[a b c d e f g h]
+ └─┴─┘                창문 1
+           └─┴─┘      창문 6 (마지막)
+→ 출력 6칸. 양 끝 1칸씩, 총 2칸 손실
+
+손실 = (k-1) × dilation = 2d
+padding=d → 양쪽 d칸씩 총 2d칸 추가 → 2d 추가 - 2d 손실 = 0 ✅
+```
+
+길이가 유지되어야 LSTM에 넣을 때 시간축이 온전히 120일로 남는다.
+
+### 4-3. pooling — 두 종류를 구분할 것
+
+| | 뜻 | 어디에 |
+|---|---|---|
+| Max/Avg pooling | 길이를 절반으로 줄여 요약 `[B,C,120]→[B,C,60]` | **논문**의 CNN |
+| Attention pooling | 시간축을 완전히 없애며 가중평균 `[B,120,128]→[B,128]` | **lens** 코드 |
+
+공통점은 "여러 개를 하나로 줄인다". 차이는 줄이는 방식 —
+최댓값을 뽑느냐(max) vs 학습된 중요도로 가중평균하느냐(attention).
+
+**lens엔 max pooling이 없다.** dilation으로 시야를 넓히므로 길이를 줄일 필요가 없고,
+마지막에 attention으로 한 번에 접는다.
+
+---
+
+## 5. lens 연계
+
+대상: `lens/ai/models/cnn_lstm.py` (+ `blocks.py`의 `AttentionPooling1D`)
+모델 등록: `lens/ai/train.py` `MODEL_REGISTRY["cnn_lstm"]`
+
+### 5-1. 논문 → lens 업그레이드
+
+| # | 논문 (Lu et al. 2020) | lens `cnn_lstm.py` | 왜 |
+|---|---|---|---|
+| 1 | 일반 Conv + Pooling | dilated conv `(1,2,4,8)` | 6층으로 120일 커버 (일반은 60층 필요) |
+| 2 | 10일 × 8피처 | 252일 × 36피처 | 긴 맥락 + 캘린더 7채널 |
+| 3 | LSTM 마지막 hidden state | `AttentionPooling1D` | 어느 날이 중요한지 학습으로 결정 |
+| 4 | (없음) | residual + LayerNorm | 깊은 스택 학습 안정화 |
+| 5 | 다음날 종가 1개 | horizon 5 + band(분위수) | 다중 시점 + 불확실성 구간 |
+
+### 5-2. 논문에 없고 코드에만 있는 것
+
+**① `conv_residual_proj` (1×1 conv)**
+
+```python
+self.conv_residual_proj = nn.Conv1d(n_features, cnn_channels, kernel_size=1)
+...
+return self.conv_dropout(hidden + residual)
+```
+
+입력(36채널)과 conv 출력(64채널)은 채널 수가 달라 그냥 더할 수 없다.
+1×1 conv가 36→64로 맞춰준다. 이 `hidden + residual` 덧셈은
+수학 3-1의 `C_t = f⊙C_{t-1} + i⊙C̃_t` 와 정확히 같은 원리.
+
+**② cuDNN 비활성화 — 논문엔 없는 순수 엔지니어링**
+
+```python
+# Windows CUDA 환경에서 cuDNN LSTM 출력이 head와 연결된 뒤
+# 프로세스 종료 시 네이티브 크래시를 일으키는 사례가 있어 비활성화
+cudnn_enabled = not sequence_hidden.is_cuda
+```
+
+실제로 돌려본 사람만 아는 종류의 코드.
+
+**③ `receptive_field` 프로퍼티**
+
+```python
+return 1 + 2 * sum(self.dilations)   # = 31
+```
+
+수학 3-2에서 유도한 공식이 그대로 코드에 있다. 하이퍼파라미터를 바꿔도 자동 계산.
+
+### 5-3. 관찰 — RF 31 vs seq_len 252
+
+`receptive_field = 31`인데 `seq_len` 기본값은 252다.
+conv 스택이 실제로 보는 건 31일뿐이고 나머지는 LSTM이 커버하는 구조.
+
+논문(10일 입력, RF 3~5)에선 문제가 아니었지만 lens 비율(31/252 ≈ 12%)에서는
+**conv가 지역 패턴만 보고 중장기는 전부 LSTM에 의존**한다는 뜻이다.
+
+> lens에서 CNN-LSTM이 "reserve 후보"이고 PatchTST가 운영 모델인 이유와
+> 연결될 수 있다. PatchTST는 patch로 입력 전체를 균등하게 본다. (4주차에서 대비)
+
+---
+
+## 6. 참고
+
+- 논문: https://onlinelibrary.wiley.com/doi/10.1155/2020/6622927
+- lens 구현: `ai/models/cnn_lstm.py`, `ai/models/blocks.py`
+- 학습 코드: [`code/solution.py`](code/solution.py), [`code/run_shapes.py`](code/run_shapes.py)
+
+### 셀프 퀴즈 (다음 주 복습용)
+
+1. CNN과 LSTM의 역할 분담을 한 문장으로?
+2. `[B, 120, 36]` → `[B, 36, 120]` 으로 바꾸는 코드는? 안 바꾸면 무슨 일이?
+3. `k=3, dilation=[1,2,4,8]` 의 receptive field는? 공식은?
+4. `padding=dilation` 인 이유는?
+5. LSTM의 `C_t = f⊙C_{t-1} + i⊙C̃_t` 에서 덧셈이 중요한 이유는? 어떤 개념과 연결되나?
+
