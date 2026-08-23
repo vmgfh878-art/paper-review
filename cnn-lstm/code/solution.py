@@ -4,7 +4,7 @@ CNN-LSTM 정답본 (1주차)
 원본: lens/ai/models/cnn_lstm.py + lens/ai/models/blocks.py
 논문 핵심 골격만 남기고 축약. (출력 헤드/fp32/티커임베딩 제거)
 
-    python 01-cnn-lstm/code/run_shapes.py --mode solution
+    python cnn-lstm/code/run_shapes.py --mode solution
 
 shape 흐름:
     [B, 120, 36] --permute(0,2,1)--> [B, 36, 120] --conv x4--> [B, 64, 120]

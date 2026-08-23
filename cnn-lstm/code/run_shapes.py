@@ -1,8 +1,8 @@
 """
 shape 검증 스크립트.
 
-    python 01-cnn-lstm/code/run_shapes.py                 # fill_in.py 채점
-    python 01-cnn-lstm/code/run_shapes.py --mode solution # 정답본 확인
+    python cnn-lstm/code/run_shapes.py                 # fill_in.py 채점
+    python cnn-lstm/code/run_shapes.py --mode solution # 정답본 확인
 
 더미 텐서를 흘려서 각 단계 shape가 기대값과 맞는지 본다.
 추상 개념을 텐서 모양으로 눈으로 확인하는 게 목적.
