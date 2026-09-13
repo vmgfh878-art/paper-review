@@ -13,6 +13,7 @@
 |---|---|---|
 | CNN-LSTM | Lu et al., Complexity 2020 | [리뷰](cnn-lstm/review.md) |
 | PatchTST | Nie et al., ICLR 2023 | [리뷰](patchtst/review.md) |
+| VMD | Dragomiretskiy & Zosso, IEEE TSP 2014 | [리뷰](vmd/review.md) |
 
 ### LLM
 
@@ -57,8 +58,12 @@
 ```
 논문이름/
   review.md      # 리뷰
+  summary.md     # 설명 대본 — 발표·스터디가 있을 때
+  questions.md   # 예상 질문과 답 — 발표·스터디가 있을 때
   code/          # 구현을 따라간 경우에만
 ```
+
+`review.md` 외의 파일은 필요할 때만 둡니다. 새로운 종류의 정리가 생기면 이 목록에 추가합니다.
 
 코드가 있는 리뷰에는 shape 검증 스크립트를 함께 둡니다.
 
