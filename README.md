@@ -13,7 +13,6 @@
 |---|---|---|
 | CNN-LSTM | Lu et al., Complexity 2020 | [리뷰](cnn-lstm/review.md) |
 | PatchTST | Nie et al., ICLR 2023 | [리뷰](patchtst/review.md) |
-| VMD | Dragomiretskiy & Zosso, IEEE TSP 2014 | [리뷰](vmd/review.md) |
 
 ### LLM
 
@@ -22,15 +21,11 @@
 | Attention Is All You Need | Vaswani et al., NIPS 2017 | [발표자료](attention-is-all-you-need/) |
 | Contrastive Decoding | Li et al., ACL 2023 | [리뷰](contrastive-decoding/review.md) |
 
-### 기후
-
-| 논문 | 출처 | |
-|---|---|---|
-| Deep learning and process understanding for data-driven Earth system science | Reichstein et al., Nature 2019 | [리뷰](deep-learning-earth-system/review.md) |
-
 <!-- 새 분야는 논문이 들어올 때 섹션을 추가합니다 -->
 
 ## 읽을 논문
+
+축별 후보와 abstract 정리는 [연구 방향](research-direction/README.md) 에 있습니다.
 
 - TiDE — Das et al., TMLR 2023
 - TCN — Bai et al., 2018
